@@ -17,7 +17,7 @@ import java.io.IOException;
 @WebFilter(urlPatterns = "/*")
 @Import({MultipleDBContextHolder.class})
 public class MultipleDBFilter implements Filter {
-    @Value("${spring.multiple.data.header.name:X-DB-NAME}")
+    @Value("${spring.multiple.database.header.name:X-DB-NAME}")
     private String header;
     private final ApplicationContext context;
 
