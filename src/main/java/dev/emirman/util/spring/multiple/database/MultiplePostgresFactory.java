@@ -2,12 +2,16 @@ package dev.emirman.util.spring.multiple.database;
 
 import com.zaxxer.hikari.HikariDataSource;
 import dev.emirman.util.spring.multiple.database.context.MultipleDBContextHolder;
+import dev.emirman.util.spring.multiple.database.filter.MultipleDBFilter;
 import dev.emirman.util.spring.multiple.database.routing.DynamicRoutingDataSource;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Scope;
 import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -29,6 +33,7 @@ import java.util.Map;
 import java.util.Properties;
 
 @Component
+@Import({MultipleDBFilter.class})
 public class MultiplePostgresFactory {
     private static Map<String, JdbcTemplate> templates;
     private static Map<String, DataSource> sources;
@@ -37,13 +42,21 @@ public class MultiplePostgresFactory {
     private static Map<String, JpaTransactionManager> managers;
     private static HibernateJpaDialect dialect;
     private final ApplicationContext context;
-    @Value("${spring.datasource.url:jdbc:postgresql://localhost:5432}")
-    private String url;
+    Logger logger = LoggerFactory.getLogger(MultiplePostgresFactory.class);
     @Value("${spring.datasource.username:}")
     private String username;
     @Value("${spring.datasource.password:}")
     private String password;
-
+    @Value("${spring.datasource.url:}")
+    private String url;
+    @Value("${spring.jpa.hibernate.ddl-auto:}")
+    private String hibernateDdlAuto;
+    @Value("${spring.jpa.properties.hibernate.dialect:}")
+    private String hibernateDialect;
+    @Value("${spring.jpa.properties.hibernate.show-sql:}")
+    private String hibernateShowSql;
+    @Value("${spring.datasource.driver-class-name:}")
+    private String driver;
 
     public MultiplePostgresFactory(ApplicationContext context) {
         templates = new HashMap<>();
@@ -53,14 +66,15 @@ public class MultiplePostgresFactory {
         managers = new HashMap<>();
         dialect = new HibernateJpaDialect();
         this.context = context;
+        logger.info("MultiplePostgresFactory initialized");
     }
 
-    private static HikariDataSource hikariDataSource(DriverManagerDataSource source) {
+    private HikariDataSource hikariDataSource(DriverManagerDataSource source) {
         HikariDataSource hikari = new HikariDataSource();
         hikari.setJdbcUrl(source.getUrl());
         hikari.setUsername(source.getUsername());
         hikari.setPassword(source.getPassword());
-        hikari.setDriverClassName("org.postgresql.Driver");
+        hikari.setDriverClassName(driver);
         hikari.setAutoCommit(true);
         return hikari;
     }
@@ -155,7 +169,7 @@ public class MultiplePostgresFactory {
     private DataSource createSource(String database) {
         String defaultUrl = url.substring(0, url.lastIndexOf('/') + 1);
         DriverManagerDataSource source = new DriverManagerDataSource(defaultUrl, username, password);
-        source.setDriverClassName("org.postgresql.Driver");
+        source.setDriverClassName(driver);
         source.setPassword(password);
         source.setUsername(username);
         try {
@@ -170,7 +184,7 @@ public class MultiplePostgresFactory {
 
         String url = this.url.substring(0, this.url.lastIndexOf('/') + 1) + database;
         source = new DriverManagerDataSource(url, username, password);
-        source.setDriverClassName("org.postgresql.Driver");
+        source.setDriverClassName(driver);
         source.setUrl(url);
         source.setPassword(password);
         source.setUsername(username);
@@ -205,14 +219,14 @@ public class MultiplePostgresFactory {
         manager.setJpaDialect(dialect);
         manager.setPersistenceUnitName(database);
         Properties jpaProperties = new Properties();
-        jpaProperties.setProperty("hibernate.hbm2ddl.auto", "update");
-        jpaProperties.setProperty("hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect");
+        jpaProperties.setProperty("hibernate.hbm2ddl.auto", hibernateDdlAuto);
+        jpaProperties.setProperty("hibernate.dialect", hibernateDialect);
+        jpaProperties.setProperty("hibernate.show_sql", hibernateShowSql);
         manager.setJpaProperties(jpaProperties);
         manager.afterPropertiesSet();
         DataSource source = context.getBean("dataSource", DataSource.class);
-        if (source instanceof DynamicRoutingDataSource dataSource) {
+        if (source instanceof DynamicRoutingDataSource dataSource)
             dataSource.addTargetDataSource(database);
-        }
         return manager;
     }
 
@@ -229,25 +243,21 @@ public class MultiplePostgresFactory {
     public PlatformTransactionManager transactionManager(MultiplePostgresFactory factory) {
         String database = MultipleDBContextHolder.database();
         String defaultDatabase = factory.defaultDatabase();
-        if (database == null) {
-            return factory.transactionManager(defaultDatabase);
-        }
-        var manager = factory.transactionManager();
-        return manager;
+        if (database == null) return factory.transactionManager(defaultDatabase);
+        return factory.transactionManager();
     }
 
     @Bean(name = "dataSource")
     @Scope(value = "prototype", proxyMode = ScopedProxyMode.TARGET_CLASS)
     public DataSource dynamicDataSource(MultiplePostgresFactory factory) {
         var source = new DynamicRoutingDataSource(factory);
+        source.setTargetDataSources(factory.targetSources());
         boolean isDefault = MultipleDBContextHolder.database() == null;
         if (isDefault) {
-            source.setTargetDataSources(factory.targetSources());
             source.setDefaultTargetDataSource(factory.source(factory.defaultDatabase()));
             source.afterPropertiesSet();
             return source;
         }
-        source.setTargetDataSources(factory.targetSources());
         source.setDefaultTargetDataSource(factory.source());
         source.afterPropertiesSet();
         return source;

@@ -15,7 +15,6 @@ public class DynamicRoutingDataSource extends AbstractRoutingDataSource {
     protected Object determineCurrentLookupKey() {
         String database = MultipleDBContextHolder.database();
         boolean isNull = database == null;
-        if (!isNull) System.out.println("determineCurrentLookupKey: " + database);
         return isNull ? factory.defaultDatabase() : database;
     }
 

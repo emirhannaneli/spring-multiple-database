@@ -3,15 +3,15 @@ package dev.emirman.util.spring.multiple.database.context;
 import org.springframework.stereotype.Component;
 
 @Component
-public record MultipleDBContextHolder() {
-    private final static ThreadLocal<String> database = new ThreadLocal<>();
+public class MultipleDBContextHolder {
+    private static String database;
 
     public static void database(String databaseName) {
-        database.set(databaseName);
+        database = databaseName;
     }
 
     public static String database() {
-        return database.get();
+        return database;
     }
 
 

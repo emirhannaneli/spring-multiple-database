@@ -9,11 +9,13 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 
 import java.io.IOException;
 
 @Configuration
 @WebFilter(urlPatterns = "/*")
+@Import({MultipleDBContextHolder.class})
 public class MultipleDBFilter implements Filter {
     @Value("${spring.multiple.data.header.name:X-DB-NAME}")
     private String header;
