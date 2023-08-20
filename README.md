@@ -62,7 +62,7 @@ public class MultipleDBDemo {
 ```yaml
 spring:
   multiple:
-    data:
+    database:
       header:
         name: X-Data-Source
   datasource:
