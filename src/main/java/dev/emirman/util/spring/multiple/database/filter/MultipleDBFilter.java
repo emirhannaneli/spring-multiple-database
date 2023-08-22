@@ -7,7 +7,6 @@ import jakarta.servlet.*;
 import jakarta.servlet.annotation.WebFilter;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 
@@ -17,13 +16,8 @@ import java.io.IOException;
 @WebFilter(urlPatterns = "/*")
 @Import({MultipleDBContextHolder.class})
 public class MultipleDBFilter implements Filter {
-    @Value("${spring.multiple.database.header.name:X-DB-NAME}")
+    @Value("${spring.multiple.database.header.name:X-Data-Source}")
     private String header;
-    private final ApplicationContext context;
-
-    public MultipleDBFilter(ApplicationContext context) {
-        this.context = context;
-    }
 
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {

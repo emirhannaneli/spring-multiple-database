@@ -1,6 +1,7 @@
 package dev.emirman.util.spring.multiple.database;
 
 import com.zaxxer.hikari.HikariDataSource;
+import dev.emirman.util.spring.multiple.database.annotation.jpa.event.EnableMultipleJPAListener;
 import dev.emirman.util.spring.multiple.database.context.MultipleDBContextHolder;
 import dev.emirman.util.spring.multiple.database.filter.MultipleDBFilter;
 import dev.emirman.util.spring.multiple.database.routing.DynamicRoutingDataSource;
@@ -9,6 +10,7 @@ import jakarta.persistence.EntityManagerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.orm.jpa.JpaProperties;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
@@ -33,7 +35,7 @@ import java.util.Map;
 import java.util.Properties;
 
 @Component
-@Import({MultipleDBFilter.class})
+@Import(MultipleDBFilter.class)
 public class MultiplePostgresFactory {
     private static Map<String, JdbcTemplate> templates;
     private static Map<String, DataSource> sources;
@@ -42,23 +44,23 @@ public class MultiplePostgresFactory {
     private static Map<String, JpaTransactionManager> managers;
     private static HibernateJpaDialect dialect;
     private final ApplicationContext context;
-    Logger logger = LoggerFactory.getLogger(MultiplePostgresFactory.class);
     @Value("${spring.datasource.username:}")
     private String username;
     @Value("${spring.datasource.password:}")
     private String password;
     @Value("${spring.datasource.url:}")
     private String url;
-    @Value("${spring.jpa.hibernate.ddl-auto:}")
+    @Value("${spring.jpa.hibernate.ddl-auto:update}")
     private String hibernateDdlAuto;
-    @Value("${spring.jpa.properties.hibernate.dialect:}")
+    @Value("${spring.jpa.database-platform:}")
     private String hibernateDialect;
-    @Value("${spring.jpa.properties.hibernate.show-sql:}")
+    @Value("${spring.jpa.show-sql:false}")
     private String hibernateShowSql;
     @Value("${spring.datasource.driver-class-name:}")
     private String driver;
 
     public MultiplePostgresFactory(ApplicationContext context) {
+        Logger logger = LoggerFactory.getLogger(MultiplePostgresFactory.class);
         templates = new HashMap<>();
         sources = new HashMap<>();
         targetSources = new HashMap<>();
@@ -144,6 +146,7 @@ public class MultiplePostgresFactory {
         return targetSources.computeIfAbsent(database, this::createTargetSource);
     }
 
+
     private PlatformTransactionManager createTransactionManager() {
         return transactionManager();
     }
@@ -193,16 +196,25 @@ public class MultiplePostgresFactory {
 
     private EntityManagerFactory createFactory(String database) {
         var factory = new LocalContainerEntityManagerFactoryBean();
-        Properties jpaProperties = new Properties();
-        jpaProperties.setProperty("hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect");
-        jpaProperties.setProperty("hibernate.hbm2ddl.auto", "update");
-        factory.setJpaProperties(jpaProperties);
-        factory.setPackagesToScan("dev.emirman"); // TODO: 2021-10-13 change this
+        Properties properties = properties();
+        factory.setJpaProperties(properties);
+        String[] packages = MultipleDBContextHolder.scanPackages();
+        factory.setPackagesToScan(packages);
         factory.setDataSource(source(database));
         factory.setPersistenceUnitName(database);
         factory.setJpaVendorAdapter(new HibernateJpaVendorAdapter());
         factory.afterPropertiesSet();
         return factory.getObject();
+    }
+
+    private Properties properties() {
+        Properties properties = new Properties();
+        properties.setProperty("hibernate.hbm2ddl.auto", hibernateDdlAuto);
+        properties.setProperty("hibernate.dialect", hibernateDialect);
+        properties.setProperty("hibernate.show_sql", hibernateShowSql);
+        properties.setProperty("hibernate.implicit_naming_strategy", "org.springframework.boot.orm.jpa.hibernate.SpringImplicitNamingStrategy");
+        properties.setProperty("hibernate.physical_naming_strategy", "org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy");
+        return properties;
     }
 
     private EntityManagerFactory createFactory() {

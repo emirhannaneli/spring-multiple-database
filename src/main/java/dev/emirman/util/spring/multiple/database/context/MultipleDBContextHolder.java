@@ -6,6 +6,8 @@ import org.springframework.stereotype.Component;
 public class MultipleDBContextHolder {
     private static String database;
 
+    private static String[] scanPackages;
+
     public static void database(String databaseName) {
         database = databaseName;
     }
@@ -14,5 +16,12 @@ public class MultipleDBContextHolder {
         return database;
     }
 
+    public static void scanPackages(String[] scanPackages) {
+        MultipleDBContextHolder.scanPackages = scanPackages;
+    }
+
+    public static String[] scanPackages() {
+        return scanPackages;
+    }
 
 }
